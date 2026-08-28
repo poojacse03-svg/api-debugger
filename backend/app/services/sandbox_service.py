@@ -2,6 +2,8 @@ import subprocess
 import json
 import os
 import logging
+import re
+
 
 logger = logging.getLogger("sandbox_service")
 logging.basicConfig(level=logging.INFO)
@@ -10,10 +12,36 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 PATCH_FILE_PATH = os.path.join(PROJECT_ROOT, "sandbox", "candidate.patch")
 IMAGE_NAME = "api-debugger-sandbox"
 
+def _normalize_patch(patch_text: str) -> str:
+    """Recompute @@ hunk header line counts instead of trusting the AI's arithmetic."""
+    lines = patch_text.split("\n")
+    out = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = re.match(r"^@@ -(\d+),?\d* \+(\d+),?\d* @@(.*)", line)
+        if m:
+            old_start, new_start, rest = m.group(1), m.group(2), m.group(3)
+            body = []
+            j = i + 1
+            while j < len(lines) and not lines[j].startswith("@@") \
+                    and not lines[j].startswith("--- ") and not lines[j].startswith("+++ "):
+                body.append(lines[j])
+                j += 1
+            old_count = sum(1 for l in body if not l.startswith("+"))
+            new_count = sum(1 for l in body if not l.startswith("-"))
+            out.append(f"@@ -{old_start},{old_count} +{new_start},{new_count} @@{rest}")
+            out.extend(body)
+            i = j
+        else:
+            out.append(line)
+            i += 1
+    return "\n".join(out)
 
 def write_patch(patch_text: str) -> None:
     """Write the AI-generated patch to the file the sandbox will apply, forcing LF endings."""
     normalized = patch_text.replace("\r\n", "\n")
+    normalized = _normalize_patch(normalized)
     if not normalized.endswith("\n"):
         normalized += "\n"
     with open(PATCH_FILE_PATH, "w", newline="\n") as f:
