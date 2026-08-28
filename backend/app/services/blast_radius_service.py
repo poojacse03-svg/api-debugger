@@ -93,3 +93,7 @@ def analyze_blast_radius(patch_text: str, affected_files: list[str]) -> dict:
         "risk_level": risk,
         "reason": "; ".join(reason_parts),
     }
+
+# Alias for backend teammate's expected function name
+def calculate_blast_radius(patch_text: str, affected_files: list[str]) -> dict:
+    return analyze_blast_radius(patch_text, affected_files)

@@ -117,3 +117,18 @@ def revert_patched_file(original_content: str, file_relative_path: str) -> None:
     with open(file_path, "w", newline="\n") as f:
         f.write(original_content)
 
+# Alias for backend teammate's expected function name
+# Accepts (incident, patch_text) — reads/reverts the demo target file internally
+def verify_patch(incident, patch_text: str) -> dict:
+    target_file_relative_path = "demo/vulnerable_app/checkout.py"
+    file_abs_path = os.path.join(PROJECT_ROOT, target_file_relative_path)
+
+    with open(file_abs_path, "r") as f:
+        original_content = f.read()
+
+    write_patch(patch_text)
+    result = run_sandbox()
+    revert_patched_file(original_content, target_file_relative_path)
+
+    result["status"] = "verified" if result.get("verified") else "unverified"
+    return result

@@ -137,3 +137,22 @@ Stderr from failed test run:
 
     logger.info(f"Root cause identified: {data['root_cause']}")
     return data
+
+# Alias for backend teammate's expected function name
+# Accepts the SQLAlchemy Incident object directly and pulls demo source context
+def analyze_incident(incident) -> dict:
+    demo_file_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "..", "demo", "vulnerable_app", "checkout.py"
+    )
+    with open(demo_file_path, "r") as f:
+        checkout_code = f.read()
+
+    source_files = {
+        "demo/vulnerable_app/checkout.py": checkout_code
+    }
+
+    return analyze_error(
+        error_message=incident.error_message,
+        stack_trace=incident.stack,
+        source_files=source_files,
+    )

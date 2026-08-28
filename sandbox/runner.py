@@ -37,11 +37,12 @@ def apply_patch() -> tuple[bool, str]:
         return False, "No patch file found at sandbox/candidate.patch"
 
     result = subprocess.run(
-        ["patch", "-p1", "--input", PATCH_FILE],
+        ["patch", "-p1", "--fuzz=3", "--ignore-whitespace", "--input", PATCH_FILE],
         cwd=WORKSPACE,
         capture_output=True,
         text=True,
     )
+    
     success = result.returncode == 0
     return success, (result.stdout + result.stderr)
 
