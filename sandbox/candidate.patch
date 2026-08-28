@@ -1,9 +1,10 @@
 --- a/demo/vulnerable_app/checkout.py
 +++ b/demo/vulnerable_app/checkout.py
-@@ -12,5 +12,7 @@
+@@ -12,5 +12,6 @@
  def get_checkout_email(user_id):
      user = find_user(user_id)
+-    email = user.email  # BUG: no null check -> crashes if user not found
+-    return email
 +    if user is None:
 +        return None
-     email = user.email  # BUG: no null check -> crashes if user not found
-     return email
++    return user.email

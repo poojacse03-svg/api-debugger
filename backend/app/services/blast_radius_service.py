@@ -59,16 +59,6 @@ def _classify_risk(caller_count: int, changed_files_count: int, is_critical_path
 
 
 def analyze_blast_radius(patch_text: str, affected_files: list[str]) -> dict:
-    """
-    Returns:
-    {
-      "affected_files": [...],
-      "affected_functions": [...],
-      "caller_count": int,
-      "risk_level": "LOW" | "MEDIUM" | "HIGH",
-      "reason": "..."
-    }
-    """
     function_names = _extract_function_names(patch_text)
     callers = _find_callers(function_names, affected_files, PROJECT_ROOT)
 
@@ -94,6 +84,14 @@ def analyze_blast_radius(patch_text: str, affected_files: list[str]) -> dict:
         "reason": "; ".join(reason_parts),
     }
 
-# Alias for backend teammate's expected function name
-def calculate_blast_radius(patch_text: str, affected_files: list[str]) -> dict:
-    return analyze_blast_radius(patch_text, affected_files)
+
+def calculate_blast_radius(incident_or_patch, affected_files=None):
+    if affected_files is None:
+        return {
+            "affected_files": [],
+            "affected_functions": [],
+            "caller_count": 0,
+            "risk_level": "UNKNOWN",
+            "reason": "No patch analyzed yet for this incident.",
+        }
+    return analyze_blast_radius(incident_or_patch, affected_files)

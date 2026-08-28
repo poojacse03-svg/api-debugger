@@ -1,33 +1,11 @@
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-
-// Mock data - later this will come from the real backend API
-const verificationData = {
-  "INC-1042": {
-    errorReproduced: true,
-    patchApplied: true,
-    testsPassed: 12,
-    testsTotal: 12,
-    regressionRisk: "LOW",
-    blastRadius: 3,
-    attempts: 2,
-    verified: true,
-  },
-  "INC-1041": {
-    errorReproduced: true,
-    patchApplied: false,
-    testsPassed: 0,
-    testsTotal: 8,
-    regressionRisk: "MEDIUM",
-    blastRadius: 5,
-    attempts: 1,
-    verified: false,
-  },
-}
 
 const riskColor = {
   LOW: "text-green-400",
   MEDIUM: "text-yellow-400",
   HIGH: "text-red-400",
+  UNKNOWN: "text-gray-400",
 }
 
 function CheckRow({ label, passed, value }) {
@@ -43,9 +21,31 @@ function CheckRow({ label, passed, value }) {
 
 function Verification() {
   const { id } = useParams()
-  const v = verificationData[id]
+  const [v, setV] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
-  if (!v) {
+  useEffect(() => {
+    fetch(`http://127.0.0.1:8000/api/incidents/${id}/verify`, { method: "POST" })
+      .then((res) => {
+        if (!res.ok) throw new Error("failed")
+        return res.json()
+      })
+      .then((data) => {
+        setV(data)
+        setLoading(false)
+      })
+      .catch(() => {
+        setNotFound(true)
+        setLoading(false)
+      })
+  }, [id])
+
+  if (loading) {
+    return <p className="text-gray-400">Running sandbox verification (may take 15-30s)...</p>
+  }
+
+  if (notFound || !v) {
     return (
       <div>
         <p className="text-gray-400">No verification data found for "{id}".</p>
@@ -65,28 +65,19 @@ function Verification() {
       <h1 className="text-2xl font-semibold mt-2">Patch Verification — {id}</h1>
 
       <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mt-6 max-w-xl">
-        <CheckRow label="Error reproduced" passed={v.errorReproduced} />
-        <CheckRow label="Patch applied" passed={v.patchApplied} />
+        <CheckRow label="Error reproduced" passed={v.error_reproduced} />
+        <CheckRow label="Patch applied" passed={v.patch_applied} />
         <CheckRow
           label="Tests"
-          passed={v.testsPassed === v.testsTotal}
-          value={`${v.testsPassed}/${v.testsTotal}`}
+          passed={v.tests_passed === v.total_tests && v.total_tests > 0}
+          value={`${v.tests_passed}/${v.total_tests}`}
         />
-        <div className="flex justify-between items-center py-2 border-b border-gray-800">
-          <span className="text-gray-300">Regression risk</span>
-          <span className={`font-semibold ${riskColor[v.regressionRisk]}`}>{v.regressionRisk}</span>
-        </div>
-        <div className="flex justify-between items-center py-2 border-b border-gray-800">
-          <span className="text-gray-300">Blast radius</span>
-          <span className="text-gray-100">{v.blastRadius} files</span>
-        </div>
         <div className="flex justify-between items-center py-2">
           <span className="text-gray-300">Attempts</span>
-          <span className="text-gray-100">{v.attempts}</span>
+          <span className="text-gray-100">{v.attempts || 1}</span>
         </div>
       </div>
 
-           {/* Final Status - impossible to miss */}
       <div
         className={`mt-6 max-w-xl rounded-lg p-6 text-center border-2 ${
           v.verified
@@ -97,14 +88,8 @@ function Verification() {
         <p className="text-3xl font-bold">
           {v.verified ? "🟢 VERIFIED" : "🔴 UNVERIFIED"}
         </p>
+        <p className="text-sm mt-2 text-gray-300">{v.verification_message}</p>
       </div>
-
-      <Link
-        to={`/incidents/${id}/blast-radius`}
-        className="inline-block mt-4 bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded"
-      >
-        View Blast Radius
-      </Link>
     </div>
   )
 }
