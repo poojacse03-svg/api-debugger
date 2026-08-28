@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-08-28T10:15:00Z",
+  "method": "GET",
+  "endpoint": "/checkout",
+  "statusCode": 500,
+  "responseTime": 142,
+  "errorMessage": "AttributeError: 'NoneType' object has no attribute 'email'",
+  "stack": "Traceback (most recent call last):\n  File \"checkout.py\", line 15, in get_checkout_email\n    email = user.email\nAttributeError: 'NoneType' object has no attribute 'email'",
+  "metadata": {"user_id": 999}
+}
