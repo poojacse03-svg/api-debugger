@@ -1,6 +1,7 @@
 from backend.app.api import health, logs, incidents, analysis, verification, github
 from backend.app.db.database import Base, engine
 from backend.app.models import incident
+from backend.app.models import replay_artifact
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse

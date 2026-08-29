@@ -1,6 +1,9 @@
 import re
+import json
+from sqlalchemy.orm import Session
 
 from backend.app.schemas.replay import RequestSnapshot, ResponseSnapshot
+from backend.app.models.replay_artifact import ReplayArtifact
 
 SENSITIVE_KEY_PATTERNS = [
     "password", "passwd", "secret", "token", "access_token", "refresh_token",
@@ -68,3 +71,39 @@ def capture_response(
         error_message=error_message,
         timestamp=timestamp,
     )
+
+
+def save_replay_artifact(
+    db: Session,
+    incident_id: str,
+    request: RequestSnapshot,
+    response: ResponseSnapshot,
+) -> ReplayArtifact:
+    """Persists a sanitized request/response pair for an incident. Overwrites any existing artifact for that incident."""
+    existing = db.query(ReplayArtifact).filter(ReplayArtifact.incident_id == incident_id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    artifact = ReplayArtifact(
+        incident_id=incident_id,
+        request_method=request.method,
+        request_path=request.path,
+        request_query_params=json.dumps(request.query_params),
+        request_headers=json.dumps(request.headers),
+        request_body=json.dumps(request.body),
+        request_content_type=request.content_type,
+        original_status_code=response.status_code,
+        original_response_headers=json.dumps(response.headers),
+        original_response_body=json.dumps(response.body) if response.body is not None else None,
+        original_error_message=response.error_message,
+    )
+    db.add(artifact)
+    db.commit()
+    db.refresh(artifact)
+    return artifact
+
+
+def get_replay_artifact(db: Session, incident_id: str) -> ReplayArtifact | None:
+    """Retrieves the stored replay artifact for an incident, if one exists."""
+    return db.query(ReplayArtifact).filter(ReplayArtifact.incident_id == incident_id).first()
