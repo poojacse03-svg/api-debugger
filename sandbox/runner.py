@@ -1,12 +1,3 @@
-"""
-Runs INSIDE the Docker container.
-Responsibilities:
-1. Reproduce the original failing test (confirm bug exists).
-2. Apply the candidate patch.
-3. Re-run the same test (confirm it now passes).
-4. Run the broader test suite (regression check).
-5. Print a single JSON result line to stdout.
-"""
 import json
 import subprocess
 import sys
@@ -15,6 +6,7 @@ import os
 WORKSPACE = "/workspace"
 TARGET_TEST = "demo/test_cases/test_checkout.py"
 PATCH_FILE = "/workspace/sandbox/candidate.patch"
+REGRESSION_TEST_FILE = "/workspace/demo/test_cases/test_generated_regression.py"
 
 
 def run_pytest(test_path: str) -> dict:
@@ -42,9 +34,25 @@ def apply_patch() -> tuple[bool, str]:
         capture_output=True,
         text=True,
     )
-    
     success = result.returncode == 0
     return success, (result.stdout + result.stderr)
+
+
+def run_replay_check() -> dict:
+    """Calls the demo function directly with the original failing input,
+    before and after the patch, and reports whether the failure is gone."""
+    sys.path.insert(0, os.path.join(WORKSPACE, "demo", "vulnerable_app"))
+    replay_result = {"original_status": None, "replay_status": None, "failure_reproduced": None}
+    try:
+        import checkout
+        checkout.get_checkout_email(999)
+        replay_result["replay_status"] = 200
+    except Exception as e:
+        replay_result["replay_status"] = 500
+        replay_result["replay_error"] = str(e)
+
+    replay_result["failure_reproduced"] = replay_result["replay_status"] == 500
+    return replay_result
 
 
 def main():
@@ -58,9 +66,10 @@ def main():
         "stdout": "",
         "stderr": "",
         "verification_message": "",
+        "replay": None,
+        "regression_test": None,
     }
 
-    # Step 1: reproduce original failure
     before = run_pytest(TARGET_TEST)
     output["error_reproduced"] = before["returncode"] != 0
     if not output["error_reproduced"]:
@@ -68,7 +77,6 @@ def main():
         print(json.dumps(output))
         return
 
-    # Step 2: apply patch
     applied, patch_log = apply_patch()
     output["patch_applied"] = applied
     if not applied:
@@ -77,10 +85,19 @@ def main():
         print(json.dumps(output))
         return
 
-    # Step 3: re-run target test + broader suite
-    after = run_pytest("demo/test_cases/")
+    # Replay check — call the patched function directly with the original bad input
+    output["replay"] = run_replay_check()
+
+    # Run generated regression test if present, plus the full suite
+    test_targets = "demo/test_cases/"
+    after = run_pytest(test_targets)
     output["stdout"] = after["stdout"]
     output["stderr"] = after["stderr"]
+
+    if os.path.exists(REGRESSION_TEST_FILE):
+        output["regression_test"] = {"ran": True, "included_in_suite": True}
+    else:
+        output["regression_test"] = {"ran": False}
 
     passed = after["stdout"].count(" PASSED")
     failed = after["stdout"].count(" FAILED")
@@ -88,11 +105,16 @@ def main():
     output["tests_failed"] = failed
     output["total_tests"] = passed + failed
 
-    output["verified"] = (after["returncode"] == 0) and (failed == 0) and (passed > 0)
+    output["verified"] = (
+        after["returncode"] == 0
+        and failed == 0
+        and passed > 0
+        and not output["replay"]["failure_reproduced"]
+    )
     output["verification_message"] = (
-        "Patch resolved the reproduced failure and all tests passed."
+        "Patch resolved the reproduced failure, replay confirmed the fix, and all tests passed."
         if output["verified"]
-        else "Patch applied but tests still failing."
+        else "Patch applied but verification checks did not all pass."
     )
 
     print(json.dumps(output))

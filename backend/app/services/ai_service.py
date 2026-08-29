@@ -156,3 +156,30 @@ def analyze_incident(incident) -> dict:
         stack_trace=incident.stack,
         source_files=source_files,
     )
+
+def generate_regression_test(error_message: str, root_cause: str, patch: str, existing_test_code: str) -> str:
+    """Asks Gemini to generate a pytest test that guards against this specific bug recurring."""
+    prompt = f"""You are generating a regression test for a Python codebase that uses pytest.
+
+The bug that was fixed:
+{root_cause}
+
+Original error:
+{error_message}
+
+The patch that fixed it:
+{patch}
+
+Here is an example of the existing test style/conventions to match:
+{existing_test_code}
+
+Write ONE new pytest test function that specifically verifies this exact bug cannot happen again.
+Respond with ONLY the Python test code, no markdown fences, no explanation, no imports beyond what's shown in the example style above (assume the same imports already exist).
+The function name must start with test_ and be different from any existing test names shown.
+"""
+    model = genai.GenerativeModel(model_name=MODEL_NAME)
+    response = model.generate_content(prompt)
+    code = response.text.strip()
+    code = re.sub(r"^```(python)?", "", code).strip()
+    code = re.sub(r"```$", "", code).strip()
+    return code

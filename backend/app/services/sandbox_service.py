@@ -132,3 +132,23 @@ def verify_patch(incident, patch_text: str) -> dict:
 
     result["status"] = "verified" if result.get("verified") else "unverified"
     return result
+
+REGRESSION_TEST_PATH = os.path.join(PROJECT_ROOT, "demo", "test_cases", "test_generated_regression.py")
+
+
+def write_regression_test(test_code: str) -> None:
+    """Writes the AI-generated regression test into the demo test folder, wrapped with the needed import."""
+    header = (
+        "import sys, os\n"
+        "sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'vulnerable_app'))\n"
+        "from checkout import get_checkout_email\n\n\n"
+    )
+    full_content = header + test_code + "\n"
+    with open(REGRESSION_TEST_PATH, "w", newline="\n") as f:
+        f.write(full_content)
+
+
+def remove_regression_test() -> None:
+    """Cleans up the generated regression test file after a run."""
+    if os.path.exists(REGRESSION_TEST_PATH):
+        os.remove(REGRESSION_TEST_PATH)
